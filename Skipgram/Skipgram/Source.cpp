@@ -1,4 +1,5 @@
 #include <iostream>
+#include <math.h>
 
 #define WORDS 100000
 #define FEATURES 300
@@ -17,12 +18,11 @@ float error;
 float weight01[WORDS][FEATURES];
 float weight12[FEATURES][WORDS];
 
-void error_func() {
-	float squaresum = 0;
+void cost_func() {
+	float entropy = 0;
 	for (int i = 0; i < WORDS; i++) {
-		squaresum += (target[i] - output[i])*(target[i] - output[i]);
+		entropy += -target[i] * log2(prob_dist[i]) - (1 - target[i]) * log2(1 - prob_dist[i]);
 	}
-	error = squaresum / 2;
 }
 
 void flush_arrays() {
