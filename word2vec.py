@@ -1,4 +1,5 @@
 import nltk
+import numpy
 
 def input_sampling():
 	pass
@@ -27,9 +28,34 @@ def make_voca(tokens):
 
 	return voca
 
-def make_pair(tokens):
+def make_input(voca):
+	x = []
+	for i in voca:
+		one_hot = [0] * len(voca)
+		one_hot[i] = 1
+		x.append(one_hot)
 
-	pass
+	return x
+
+def init_hidden_layer(voca):
+	w1 = []
+	for i in voca:
+		node = []
+		for j in range(3):
+			node.append(random.random())
+		w1.append(node)
+
+	return w1
+
+def init_output_layer(voca):
+	w2 = []
+	for i in range(3):
+		node = []
+		for j in voca:
+			node.append(random.random())
+		w2.append(node)
+
+	return w2
 
 if __name__ == '__main__':
 	f = open("input.txt", r)
@@ -38,4 +64,8 @@ if __name__ == '__main__':
 
 	tokens = pre_processing(input)
 	voca = make_voca(tokens)
+	input_x = make_input(voca)
+	w1 = init_hidden_layer(voca)
+	w2 = init_output_layer(voca)
 
+	
