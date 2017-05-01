@@ -149,74 +149,20 @@ double* output(network* NN) {
 
 int main() {
 	int layernum = 2;
-	int neuronnum[] = { 2,2 };
-	int inputnum[] = { 2,2 };
+	int neuronnum[] = { FEATURES,WORDS };
+	int inputnum[] = { WORDS,FEATURES };
 	network* net = createNet(2, neuronnum, inputnum);
-
-	double input[2];
-	double target[1];
-	for (int i = 0; i < 1000000; i++) {
-		input[0] = 0;
-		input[1] = 0;
+	double* input;
+	double* target;
+	for (int i = 0; i < 100000; i++) {
 		put_input(net, input);
 		calculation(net);
-		target[0] = 0;
-		target[1] = 0;
-		training(net, 0.01, target);
-
-		input[0] = 0;
-		input[1] = 1;
-		put_input(net, input);
-		calculation(net);
-		target[0] = 1;
-		target[1] = 1;
-		training(net, 0.01, target);
-
-		input[0] = 1;
-		input[1] = 0;
-		put_input(net, input);
-		calculation(net);
-		target[0] = 1;
-		target[1] = 1;
-		training(net, 0.01, target);
-
-		input[0] = 1;
-		input[1] = 1;
-		put_input(net, input);
-		calculation(net);
-		target[0] = 0;
-		target[1] = 0;
-		training(net, 0.01, target);
+		training(net, 0.1, target);
 	}
 	double *outputs;
-	input[0] = 0;
-	input[1] = 0;
 	put_input(net, input);
 	calculation(net);
 	outputs = output(net);
-
-	cout << input[0] << " " << input[1] << " " << outputs[0] << endl;
-	input[0] = 1;
-	input[1] = 0;
-	put_input(net, input);
-	calculation(net);
-	outputs = output(net);
-
-	cout << input[0] << " " << input[1] << " " << outputs[0] << endl;
-	input[0] = 0;
-	input[1] = 1;
-	put_input(net, input);
-	calculation(net);
-	outputs = output(net);
-
-	cout << input[0] << " " << input[1] << " " << outputs[0] << endl;
-	input[0] = 1;
-	input[1] = 1;
-	put_input(net, input);
-	calculation(net);
-	outputs = output(net);
-
-	cout << input[0] << " " << input[1] << " " << outputs[0] << endl;
 	getchar();
 	return 0;
 }
