@@ -151,10 +151,10 @@ int main() {
 	int layernum = 2;
 	int neuronnum[] = { FEATURES,WORDS };
 	int inputnum[] = { WORDS,FEATURES };
-	network* net = createNet(2, neuronnum, inputnum);
-	double* input;
-	double* target;
-	for (int i = 0; i < 100000; i++) {
+	network* net = createNet(2, neuronnum, inputnum); //model initialization
+	double* input; //input vector
+	double* target; //training target vector
+	for (int i = 0; i < 100000; i++) { //training section
 		put_input(net, input);
 		calculation(net);
 		training(net, 0.1, target);
