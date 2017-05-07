@@ -9,6 +9,8 @@
 using namespace std;
 
 struct node {
+	char type;
+	char num;
 	double **inputs;
 	double *output;
 	double threshold;
@@ -37,7 +39,7 @@ double randnum() {
 	return (((double)rand() * 2) / ((double)RAND_MAX + 1)) - 1;
 }
 
-network* createNet(int layers, int *nodes, int *inputs) {
+network* createNet(int layers, int *nodes, int *inputs, char* types) {
 
 	network* NN = new network;
 	NN->inputnum = inputs[0];
@@ -61,6 +63,8 @@ network* createNet(int layers, int *nodes, int *inputs) {
 			}
 			tempnodes[j].output = new double;
 			tempnodes[j].error = new double;
+			tempnodes[j].type = types[i];
+			tempnodes[j].num = j;
 			temp->outputs[j] = *(tempnodes->output);
 			tempnodes[j].weights = new double[inputs[i]];
 			for (int k = 0; k < inputs[i]; k++) {
@@ -75,7 +79,7 @@ network* createNet(int layers, int *nodes, int *inputs) {
 }
 
 void put_input(network* NN, double *inputs) {
-	for (int i=0; i < NN->inputnum; i++) {
+	for (int i = 0; i < NN->inputnum; i++) {
 		NN->inputs[i] = inputs[i];
 	}
 }
@@ -87,23 +91,41 @@ double get_output(node *Node) {
 		//cout << (*Node->inputs)[i]<<" ";
 		sum += (*Node->inputs)[i] * Node->weights[i];
 	}
+
 	sum += -1 * Node->threshold;
-	double temp = -sum;
-	*(Node->output) = 1.0 / (1 + exp(temp));
+	double temp;
+	switch (Node->type) {
+	case 'g':
+		temp = -sum;
+		*(Node->output) = 1.0 / (1 + exp(temp));
+		break;
+	case 's':
+		*(Node->output) = exp(sum);
+		break;
+	}
 	//cout << *(Node->output) << endl;
 	return *(Node->output);
 }
-
+double expsum;
 void calculation(network *NN) {
 	for (int i = 0; i < NN->layernum; i++) {
 		for (int j = 0; j < NN->layers[i].num; j++) {
-			NN->layers[i].outputs[j]=get_output(&(NN->layers[i].nodes[j]));
+			NN->layers[i].outputs[j] = get_output(&(NN->layers[i].nodes[j]));
 		}
 	}
 }
 
-double derivative(node *Node) {
-	double temp = *(Node->output) * (1.0 - *(Node->output));
+double derivative(node *Node, double* targets) {
+	double temp;
+	double *k = Node->output;
+	switch (Node->type) {
+	case 'g':
+		temp = *k * (1.0 - *k);
+		break;
+	case 's':
+		temp = 1;
+		break;
+	}
 	return temp;
 }
 
@@ -113,7 +135,7 @@ void training(network *NN, double LR, double* targets) {
 		cur = &NN->layers[i];
 		if (i == NN->layernum - 1) {
 			for (int j = 0; j < cur->num; j++) {
-				*(cur->nodes[j].error) = derivative(&cur->nodes[j])*(targets[j] - *(cur->nodes[j].output));
+				*(cur->nodes[j].error) = derivative(&cur->nodes[j],targets)*(targets[j] - *(cur->nodes[j].output));
 			}
 		}
 		else {
@@ -123,7 +145,7 @@ void training(network *NN, double LR, double* targets) {
 				for (int k = 0; k < next->num; k++) {
 					temp += *(next->nodes[k].error)*next->nodes[k].weights[j];
 				}
-				*(cur->nodes[j].error) = derivative(&cur->nodes[j])*temp;
+				*(cur->nodes[j].error) = derivative(&cur->nodes[j],targets)*temp;
 			}
 		}
 	}
@@ -134,7 +156,7 @@ void training(network *NN, double LR, double* targets) {
 		for (int j = 0; j < cur->num; j++) {
 			tempWeight = cur->nodes[j].threshold;
 			cur->nodes[j].threshold += (LR * *(cur->nodes[j].error) * -1);
-			
+
 			for (int k = 0; k < cur->nodes[j].inputnum; k++) {
 				tempWeight = cur->nodes[j].weights[k];
 				cur->nodes[j].weights[k] += (LR * *(cur->nodes[j].error) * (*cur->nodes[j].inputs)[k]);
@@ -151,7 +173,8 @@ int main() {
 	int layernum = 2;
 	int neuronnum[] = { FEATURES,WORDS };
 	int inputnum[] = { WORDS,FEATURES };
-	network* net = createNet(2, neuronnum, inputnum); //model initialization
+	char types[] = { 'g','s' };
+	network* net = createNet(2, neuronnum, inputnum, types); //model initialization
 	double* input; //input vector
 	double* target; //training target vector
 	for (int i = 0; i < 100000; i++) { //training section
