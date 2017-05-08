@@ -18,7 +18,6 @@ if __name__ == '__main__':
 	for token in tokens:
 		if token not in dictionary:
 			dictionary.append(token)
-	print(dictionary)
 
 	f = open('dictionary', 'wb')
 	pickle.dump(dictionary, f)
