@@ -100,7 +100,9 @@ double get_output(node *Node) {
 		*(Node->output) = 1.0 / (1 + exp(temp));
 		break;
 	case 's':
-		*(Node->output) = exp(sum);
+		if (sum > 5) *(Node->output) = exp(5);
+		else if (sum < -5) *(Node->output) = 0;
+		else *(Node->output) = exp(sum);
 		break;
 	}
 	//cout << *(Node->output) << endl;
