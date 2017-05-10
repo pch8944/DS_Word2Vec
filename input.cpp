@@ -6,17 +6,20 @@
 /*
 int** call_input();
 int** call_output();
+int* call_frequency();
 int line_of_file();
+int line_of_file2();
 
 void main()
 {
-	//ÀÎÇ² º¤ÅÍ ¾ò´Â ÇÔ¼ö
+
+	//ì¸í’‹ ë²¡í„° ì–»ëŠ” í•¨ìˆ˜
 	int** input;
 	int i, no;
-
+	
 	input = call_input();
 
-	// µ¿ÀûÇÒ´ç ÇØÁ¦ÇÏ´Â ºÎºĞ
+	// ë™ì í• ë‹¹ í•´ì œí•˜ëŠ” ë¶€ë¶„
 	no = line_of_file();
 	for (i = 0; i < no; i++) {
 		free(input[i]);
@@ -25,12 +28,19 @@ void main()
 
 	int** output;
 	
-	// ¾Æ¿ôÇ²º¤ÅÍ ¾ò´Â ÇÔ¼ö ¹× µ¿ÀûÇÒ´ç ÇØÁ¦
+	// ì•„ì›ƒí’‹ë²¡í„° ì–»ëŠ” í•¨ìˆ˜ ë° ë™ì í• ë‹¹ í•´ì œ
 	output = call_output();
 	for (i = 0; i < no; i++) {
 		free(output[i]);
 	}
 	free(output);
+
+	// frequency í˜¸ì¶œ ë° ë™ì í• ë‹¹ í•´ì œ
+	int* frequency;
+	call_frequency();
+	free(frequency);
+
+	return;
 
 }
 */
@@ -127,6 +137,40 @@ int** call_output() {
 	return arr;
 }
 
+int* call_frequency() {
+	FILE *fp;
+	errno_t err;
+
+	char buffer[50];
+	int no, i, j, k = 0, position = 0, sum, front, end;
+	int *arr;
+
+	no = line_of_file2();
+	arr = (int*)malloc(sizeof(int) * no);
+
+	err = fopen_s(&fp, "D://frequency.txt", "r");
+
+	
+	j = 0;
+	while (j<no) {
+		fgets(buffer, sizeof(buffer), fp);
+		for (i = 0; buffer[i] != 10; i++) {
+			position = i;
+		}
+		for (i = 0, sum = 0; position >= 0; i++, position--) {
+			sum += pow(10, i)*(buffer[position] - '0');
+		}
+
+		arr[j] = sum;
+		j++;
+
+	}
+
+	fclose(fp);
+
+	return arr;
+}
+
 int line_of_file() {
 	FILE *fp;
 	errno_t err;
@@ -143,4 +187,22 @@ int line_of_file() {
 	fclose(fp);
 
 	return i-1;
+}
+
+int line_of_file2() {
+	FILE *fp;
+	errno_t err;
+
+	char file_check[50];
+	int i = 0;
+
+	err = fopen_s(&fp, "D://frequency.txt", "r");
+	while (!feof(fp)) {
+		fgets(file_check, sizeof(file_check), fp);
+		i++;
+	}
+
+	fclose(fp);
+
+	return i - 1;
 }
