@@ -1,10 +1,9 @@
 #include"input.h"
 
-#define DIMENSION 10000
 #define WINDOW 6
 
 /*
-int** call_input();
+int* call_input();
 int** call_output();
 int* call_frequency();
 int line_of_file();
@@ -14,18 +13,14 @@ void main()
 {
 
 	//인풋 벡터 얻는 함수
-	int** input;
+	int* input;
 	int i, no;
 	
 	input = call_input();
 
 	// 동적할당 해제하는 부분
 	no = line_of_file();
-	for (i = 0; i < no; i++) {
-		free(input[i]);
-	}
 	free(input);
-
 	int** output;
 	
 	// 아웃풋벡터 얻는 함수 및 동적할당 해제
@@ -39,28 +34,21 @@ void main()
 	int* frequency;
 	call_frequency();
 	free(frequency);
-
 	return;
 
 }
 */
 
-int** call_input() {
+int* call_input() {
 	FILE *fp;
 	errno_t err;
 
 	char buffer[50];
 	int no, i=0, j=0, position, sum=0;
-	int **arr;
+	int *arr;
 
 	no = line_of_file();
-	arr = (int**)malloc(sizeof(int*) * no);
-	for (i = 0; i < no; i++) {
-		arr[i] = (int*)malloc(sizeof(int) * DIMENSION);
-		for (j = 0; j < DIMENSION; j++) {
-			arr[i][j] = 0;
-		}
-	}
+	arr = (int*)malloc(sizeof(int) * no);
 
 	err = fopen_s(&fp, "D://input.txt", "r");
 
@@ -74,7 +62,7 @@ int** call_input() {
 			sum += pow(10, i)*(buffer[position] - '0');
 		}
 
-		arr[j][sum] = 1;
+		arr[j] = sum;
 		j++;
 
 	}
