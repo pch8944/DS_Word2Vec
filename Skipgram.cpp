@@ -1,5 +1,6 @@
 #include <iostream>
 #include <math.h>
+#include <vector>
 
 #define WORDS 100000
 #define FEATURES 300
@@ -7,6 +8,15 @@
 #define LRATE 0.001
 
 using namespace std;
+
+struct wordfreq {
+	int num = -1;
+	int freq=0;
+	node* node=0;
+	wordfreq* left = 0;
+	wordfreq* right = 0;
+};
+
 
 struct node {
 	char type;
@@ -169,6 +179,60 @@ void training(network *NN, double LR, double* targets) {
 
 double* output(network* NN) {
 	return *(NN->outputs);
+}
+
+void bulidHTree(int* freq, network* NN) {
+	cout << "Building Huffman Tree.." << endl;
+	vector<wordfreq*> leaf(WORDS);
+	for (int i = 0; i < WORDS; i++) {
+		leaf[i] = new wordfreq;
+		leaf[i]->freq = freq[i];
+		leaf[i]->num = i;
+	}
+	
+	int na = WORDS;
+	while (na) {
+		wordfreq *l1 ,*l2;
+		int l1i, l2i;
+		if (leaf[0]->freq < leaf[1]->freq) {
+			l1 = leaf[0];
+			l1i = 0;
+			l2 = leaf[1];
+			l2i = 1;
+		}
+		else {
+			l1 = leaf[1];
+			l1i = 1;
+			l2 = leaf[0];
+			l2i = 0;
+		}
+		for (int i = 0; i < na; i++) {
+			if (l2->freq > leaf[i]->freq) {
+				l2 = leaf[i];
+				l2i = i;
+				if (l1->freq > l2->freq) {
+					wordfreq *temp = l1;
+					int tempi = l1i;
+					l1 = l2;
+					l1i = l2i;
+					l2 = temp;
+					l2i = tempi;
+				}
+			}
+			wordfreq *temp = new wordfreq;
+			temp->freq = l1->freq + l2->freq;
+			temp->left = l1;
+			temp->right = l2;
+			temp->node = &NN->layers[NN->layernum - 1].nodes[WORDS - na];
+			
+			leaf[l1i] = temp;
+			leaf[l2i] = leaf[na-1];
+			leaf[na - 1] = leaf[l2i];
+			na--;
+		}
+	}
+	
+
 }
 
 int main() {
