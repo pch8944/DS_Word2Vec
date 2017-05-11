@@ -23,39 +23,39 @@ struct wordfreq {
 struct node {
 	char type;
 	char num;
-	double **inputs;
-	double *output;
-	double threshold;
-	double dthreshold;
-	double *weights;
-	double *oldWeights;
+	float **inputs;
+	float *output;
+	float threshold;
+	float dthreshold;
+	float *weights;
+	float *oldWeights;
 	int inputnum;
-	double *error;
+	float *error;
 };
 
 struct layer {
 	int num;
 	node *nodes;
-	double* outputs;
+	float* outputs;
 };
 
 struct network {
 	int inputnum;
-	double *inputs;
-	double **outputs;
+	float *inputs;
+	float **outputs;
 	int layernum;
 	layer *layers;
 };
 
-double randnum() {
-	return (((double)rand() * 2) / ((double)RAND_MAX + 1)) - 1;
+float randnum() {
+	return (((float)rand() * 2) / ((float)RAND_MAX + 1)) - 1;
 }
 
 network* createNet(int layers, int *nodes, int *inputs, char* types) {
 
 	network* NN = new network;
 	NN->inputnum = inputs[0];
-	NN->inputs = new double[NN->inputnum];
+	NN->inputs = new float[NN->inputnum];
 	NN->layernum = layers;
 	NN->layers = new layer[layers];
 	layer *old = NULL;
@@ -63,7 +63,7 @@ network* createNet(int layers, int *nodes, int *inputs, char* types) {
 		layer *temp = &(NN->layers[i]);
 		temp->num = nodes[i];
 		temp->nodes = new node[nodes[i]];
-		temp->outputs = new double[nodes[i]];
+		temp->outputs = new float[nodes[i]];
 		node *tempnodes = temp->nodes;
 		for (int j = 0; j < nodes[i]; j++) {
 			tempnodes[j].inputnum = inputs[i];
@@ -73,12 +73,12 @@ network* createNet(int layers, int *nodes, int *inputs, char* types) {
 			else {
 				tempnodes[j].inputs = &(old->outputs);
 			}
-			tempnodes[j].output = new double;
-			tempnodes[j].error = new double;
+			tempnodes[j].output = new float;
+			tempnodes[j].error = new float;
 			tempnodes[j].type = types[i];
 			tempnodes[j].num = j;
 			temp->outputs[j] = *(tempnodes->output);
-			tempnodes[j].weights = new double[inputs[i]];
+			tempnodes[j].weights = new float[inputs[i]];
 			for (int k = 0; k < inputs[i]; k++) {
 				tempnodes[j].weights[k] = randnum();
 			}
@@ -90,7 +90,7 @@ network* createNet(int layers, int *nodes, int *inputs, char* types) {
 	return NN;
 }
 
-void put_input(network* NN, double *inputs) {
+void put_input(network* NN, float *inputs) {
 	for (int i = 0; i < NN->inputnum; i++) {
 		NN->inputs[i] = inputs[i];
 	}
@@ -102,8 +102,8 @@ float fma1(float x, float y, float z)
 }
 
 
-double get_output(node *Node) {
-	double sum = 0;
+float get_output(node *Node) {
+	float sum = 0;
 
 	for (int i = 0; i < Node->inputnum; i++) {
 		//cout << (*Node->inputs)[i]<<" ";
@@ -112,7 +112,7 @@ double get_output(node *Node) {
 	}
 
 	sum += -1 * Node->threshold;
-	double temp;
+	float temp;
 	switch (Node->type) {
 	case 'g':
 		temp = -sum;
@@ -127,7 +127,7 @@ double get_output(node *Node) {
 	//cout << *(Node->output) << endl;
 	return *(Node->output);
 }
-double expsum;
+float expsum;
 void calculation(network *NN) {
 	for (int i = 0; i < NN->layernum; i++) {
 		#pragma omp parallel for schedule(dynamic)
@@ -137,9 +137,9 @@ void calculation(network *NN) {
 	}
 }
 
-double derivative(node *Node, double* targets) {
-	double temp;
-	double *k = Node->output;
+float derivative(node *Node, float* targets) {
+	float temp;
+	float *k = Node->output;
 	switch (Node->type) {
 	case 'g':
 		temp = *k * (1.0 - *k);
@@ -151,7 +151,7 @@ double derivative(node *Node, double* targets) {
 	return temp;
 }
 
-void training(network *NN, double LR, double* targets) {
+void training(network *NN, float LR, float* targets) {
 	layer *cur;
 	for (int i = NN->layernum - 1; i >= 0; i--) {
 		cur = &NN->layers[i];
@@ -165,7 +165,7 @@ void training(network *NN, double LR, double* targets) {
 			layer *next = &NN->layers[i + 1];
 			#pragma omp parallel for schedule(dynamic)
 			for (int j = 0; j < cur->num; j++) {
-				double temp = 0;
+				float temp = 0;
 				for (int k = 0; k < next->num; k++) {
 					temp += *(next->nodes[k].error)*next->nodes[k].weights[j];
 				}
@@ -174,7 +174,7 @@ void training(network *NN, double LR, double* targets) {
 		}
 	}
 
-	double tempWeight;
+	float tempWeight;
 	for (int i = NN->layernum - 1; i >= 0; i--) {
 		cur = &NN->layers[i];
 		#pragma omp parallel for schedule(dynamic)
@@ -190,7 +190,7 @@ void training(network *NN, double LR, double* targets) {
 	}
 }
 
-double* output(network* NN) {
+float* output(network* NN) {
 	return *(NN->outputs);
 }
 
@@ -269,7 +269,7 @@ int main() {
 		if (!(i % 100))
 			cout << i / 100000.0 << endl;
 	}
-	double *outputs;
+	float *outputs;
 	put_input(net, input);
 	calculation(net);
 	outputs = output(net);
