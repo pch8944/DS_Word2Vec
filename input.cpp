@@ -3,11 +3,13 @@
 #define WINDOW 6
 
 /*
-int* call_input();
-int** call_output();
-int* call_frequency();
+void call_input(int* arr);
+void call_output(int** arr);
+void call_frequency(int* arr);
 int line_of_file();
-int line_of_file2();
+int line_of_freq();
+int get_index(char* word);
+char* get_word(int index, char* word);
 
 void main()
 {
@@ -15,40 +17,71 @@ void main()
 	//인풋 벡터 얻는 함수
 	int* input;
 	int i, no;
-	
-	input = call_input();
+
+	no = line_of_file();
+	input = (int*)malloc(sizeof(int) * no);
+	call_input(input);
+
+	printf("%d\n", input[2]);
 
 	// 동적할당 해제하는 부분
-	no = line_of_file();
 	free(input);
-	int** output;
 	
 	// 아웃풋벡터 얻는 함수 및 동적할당 해제
-	output = call_output();
+	int** output;
+	int j;
+
+	no = line_of_file();
+	output = (int**)malloc(sizeof(int*) * no);
+	for (i = 0; i < no; i++) {
+		output[i] = (int*)malloc(sizeof(int) * WINDOW);
+		for (j = 0; j < WINDOW; j++) {
+			output[i][j] = 0;
+		}
+	}
+	call_output(output);
+	printf("%d\n", output[1][2]);
+
 	for (i = 0; i < no; i++) {
 		free(output[i]);
 	}
 	free(output);
 
+
 	// frequency 호출 및 동적할당 해제
 	int* frequency;
-	call_frequency();
+
+	no = line_of_freq();
+	frequency = (int*)malloc(sizeof(int) * no);
+
+	call_frequency(frequency);
+	printf("%d\n", frequency[2]);
+
 	free(frequency);
+
+	// dictionary 내의 위치 찾기
+	int index;
+	index = get_index("hello");
+	printf("%d\n", index);
+
+	// 번호를 얻었을때 매칭되는 단어 찾기
+	char word[50];
+	get_word(2, word);
+	printf("%s\n", word);
+
 	return;
 
 }
 */
 
-int* call_input() {
+void call_input(int* arr) {
 	FILE *fp;
 	errno_t err;
 
 	char buffer[50];
 	int no, i=0, j=0, position, sum=0;
-	int *arr;
 
 	no = line_of_file();
-	arr = (int*)malloc(sizeof(int) * no);
 
 	err = fopen_s(&fp, "D://input.txt", "r");
 
@@ -69,25 +102,17 @@ int* call_input() {
 
 	fclose(fp);
 
-	return arr;
+	return;
 }
 
-int** call_output() {
+void call_output(int** arr) {
 	FILE *fp;
 	errno_t err;
 
 	char buffer[50];
 	int no, i, j, k=0, position=0, sum, front, end;
-	int **arr;
 
 	no = line_of_file();
-	arr = (int**)malloc(sizeof(int*) * no);
-	for (i = 0; i < no; i++) {
-		arr[i] = (int*)malloc(sizeof(int) * WINDOW);
-		for (j = 0; j < WINDOW; j++) {
-			arr[i][j] = 0;
-		}
-	}
 
 	err = fopen_s(&fp, "D://input.txt", "r");
 
@@ -122,19 +147,17 @@ int** call_output() {
 	}
 
 	fclose(fp);
-	return arr;
+	return;
 }
 
-int* call_frequency() {
+void call_frequency(int* arr) {
 	FILE *fp;
 	errno_t err;
 
 	char buffer[50];
-	int no, i, j, k = 0, position = 0, sum, front, end;
-	int *arr;
+	int no, i, j, position = 0, sum;
 
-	no = line_of_file2();
-	arr = (int*)malloc(sizeof(int) * no);
+	no = line_of_freq();
 
 	err = fopen_s(&fp, "D://frequency.txt", "r");
 
@@ -156,7 +179,7 @@ int* call_frequency() {
 
 	fclose(fp);
 
-	return arr;
+	return;
 }
 
 int line_of_file() {
@@ -177,7 +200,7 @@ int line_of_file() {
 	return i-1;
 }
 
-int line_of_file2() {
+int line_of_freq() {
 	FILE *fp;
 	errno_t err;
 
@@ -193,4 +216,61 @@ int line_of_file2() {
 	fclose(fp);
 
 	return i - 1;
+}
+
+int get_index(char* word) {
+	char buffer[50];
+	char command[50] = "python D://word_getIndex.py ";
+	FILE *fp;
+	int result;
+
+	strcat_s(command, sizeof(command), word);
+
+	fp = _popen(command, "r");
+	if (NULL == fp)
+	{
+		perror("error: cannot run python file\n");
+		return -1;
+	}
+
+	fgets(buffer, sizeof(buffer), fp);
+
+	result = atoi(buffer);
+
+	_pclose(fp);
+
+	return result;
+
+}
+
+char* get_word(int index, char* word) {
+	char buffer[50];
+	char number[10] = { 0, };
+	char command[50] = "python D://word_getWord.py ";
+	FILE *fp;
+	int i;
+
+	_itoa_s(index, number, 10);
+
+	strcat_s(command, sizeof(command), number);
+
+	fp = _popen(command, "r");
+	if (NULL == fp)
+	{
+		perror("error: cannot run python file\n");
+		word[0] = -1;
+		word[1] = '\0';
+		return word;
+	}
+
+	fgets(buffer, sizeof(buffer), fp);
+	for (i = 0; buffer[i] != '\n'; i++) {
+		word[i] = buffer[i];
+	}
+	word[i] = '\0';
+	printf("%s", buffer);
+
+	_pclose(fp);
+
+	return word;
 }
