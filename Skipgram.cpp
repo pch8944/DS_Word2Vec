@@ -6,8 +6,8 @@
 
 
 #define WORDS 100000
-#define FEATURES 300
-#define WINDOW 5
+#define FEATURES 100
+#define WINDOW 6
 #define LRATE 0.001
 
 using namespace std;
@@ -142,47 +142,47 @@ float get_output_0(node *Node) {
 
 float expsum;
 void calculation(network *NN) {
-	#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
 	for (int j = 0; j < WORDS; j++) {
 		NN->layers[1].outputs[j] = get_output_1(&(NN->layers[1].nodes[j]));
 	}
-	#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
 	for (int j = 0; j < FEATURES; j++) {
 		NN->layers[0].outputs[j] = get_output_0(&(NN->layers[0].nodes[j]));
 	}
 }
 
 /*float derivative(node *Node, float* targets) {
-	float temp;
-	float *k = Node->output;
-	switch (Node->type) {
-	case 'g':
-		temp = *k * (1.0 - *k);
-		break;
-	case 's':
-		temp = 1;
-		break;
-	}
-	return temp;
+float temp;
+float *k = Node->output;
+switch (Node->type) {
+case 'g':
+temp = *k * (1.0 - *k);
+break;
+case 's':
+temp = 1;
+break;
+}
+return temp;
 }*/
 
 void training(network *NN, float LR, float* targets) {
 	layer *cur;
-	
+
 	cur = &NN->layers[1];
-	#pragma omp parallel for schedule(dynamic)
-	for (int j = 0; j < WORDS; j++) {
+#pragma omp parallel for schedule(dynamic)
+	for (int j = 0; j < cur->num; j++) {
 		*(cur->nodes[j].error) = (targets[j] - *(cur->nodes[j].output));
 		cur->nodes[j].threshold += (LR * *(cur->nodes[j].error) * -1);
-		for (int k = 0; k < FEATURES; k++) {
+		for (int k = 0; k < cur->nodes[j].inputnum; k++) {
 			cur->nodes[j].weights[k] += (LR * *(cur->nodes[j].error) * (*cur->nodes[j].inputs)[k]);
 		}
 	}
 
 	cur = &NN->layers[0];
 	layer *next = &NN->layers[1];
-	#pragma omp parallel for schedule(dynamic)
-	for (int j = 0; j < FEATURES; j++) {
+#pragma omp parallel for schedule(dynamic)
+	for (int j = 0; j < cur->num; j++) {
 		float temp = 0;
 		for (int k = 0; k < WORDS; k++) {
 			temp += *(next->nodes[k].error)*next->nodes[k].weights[j];
@@ -198,19 +198,19 @@ void training(network *NN, float LR, float* targets) {
 	cur = &NN->layers[1];
 	#pragma omp parallel for schedule(dynamic)
 	for (int j = 0; j < WORDS; j++) {
-		cur->nodes[j].threshold += (LR * *(cur->nodes[j].error) * -1);
-		for (int k = 0; k < FEATURES; k++) {
-			cur->nodes[j].weights[k] += (LR * *(cur->nodes[j].error) * (*cur->nodes[j].inputs)[k]);
-		}
+	cur->nodes[j].threshold += (LR * *(cur->nodes[j].error) * -1);
+	for (int k = 0; k < FEATURES; k++) {
+	cur->nodes[j].weights[k] += (LR * *(cur->nodes[j].error) * (*cur->nodes[j].inputs)[k]);
 	}
-	
+	}
+
 	cur = &NN->layers[0];
 	#pragma omp parallel for schedule(dynamic)
 	for (int j = 0; j < FEATURES; j++) {
-		cur->nodes[j].threshold += (LR * *(cur->nodes[j].error) * -1);
-		for (int k = 0; k < WORDS; k++) {
-			cur->nodes[j].weights[k] += (LR * *(cur->nodes[j].error) * (*cur->nodes[j].inputs)[k]);
-		}
+	cur->nodes[j].threshold += (LR * *(cur->nodes[j].error) * -1);
+	for (int k = 0; k < WORDS; k++) {
+	cur->nodes[j].weights[k] += (LR * *(cur->nodes[j].error) * (*cur->nodes[j].inputs)[k]);
+	}
 	}*/
 
 }
@@ -219,18 +219,16 @@ float* output(network* NN) {
 	return *(NN->outputs);
 }
 
-void bulidHTree(int* freq, network* NN) {
+int buildHTree(int* freq, network* NN, vector<wordfreq*> &leaf) {
 	cout << "Building Huffman Tree.." << endl;
-	vector<wordfreq*> leaf(WORDS);
-	for (int i = 0; i < WORDS; i++) {
-		leaf[i] = new wordfreq;
-		leaf[i]->freq = freq[i];
-		leaf[i]->num = i;
-	}
-	
+
 	int na = WORDS;
-	while (na) {
-		wordfreq *l1 ,*l2;
+	if (na > leaf.size())
+		na = leaf.size();
+	int assigned = 0;
+	wordfreq* root;
+	while (na-1) {
+		wordfreq *l1, *l2;
 		int l1i, l2i;
 		if (leaf[0]->freq < leaf[1]->freq) {
 			l1 = leaf[0];
@@ -261,28 +259,78 @@ void bulidHTree(int* freq, network* NN) {
 			temp->freq = l1->freq + l2->freq;
 			temp->left = l1;
 			temp->right = l2;
-			temp->pnode = &NN->layers[NN->layernum - 1].nodes[WORDS - na];
-			
+			temp->pnode = &NN->layers[NN->layernum - 1].nodes[assigned];
+
 			leaf[l1i] = temp;
-			leaf[l2i] = leaf[na-1];
+			leaf[l2i] = leaf[na - 1];
 			leaf[na - 1] = leaf[l2i];
 			na--;
+			assigned++;
 		}
 	}
-	
+	return assigned;
+}
+
+void getcodeword(int* code) {
 
 }
 
 int main() {
+
+	int* frequency;
+	int no = line_of_freq();
+	frequency = (int*)malloc(sizeof(int) * no);
+	call_frequency(frequency);
+
+	vector<wordfreq*> leaf(no);
+	for (int i = 0; i < no; i++) {
+		leaf[i] = new wordfreq;
+		leaf[i]->freq = frequency[i];
+		leaf[i]->num = i;
+	}
+
+
+	for (vector<wordfreq*>::iterator iter = leaf.begin(); iter != leaf.end();) {
+		if ((*iter)->freq < 4) {
+			delete(*iter);
+			iter = leaf.erase(iter);
+		}
+		else
+			++iter;
+	}
+
 	int layernum = 2;
-	int neuronnum[] = { FEATURES,WORDS };
-	int inputnum[] = { WORDS,FEATURES };
+	int neuronnum[] = { FEATURES,no };
+	int inputnum[] = { no,FEATURES };
+	int* codeword = (int*)calloc(no,sizeof(int));
+
 	char types[] = { 'g','s' };
 	network* net = createNet(2, neuronnum, inputnum, types); //model initialization
-	float* input = (float*)calloc(WORDS,sizeof(float)); //input vector
-	float* target = (float*)calloc(WORDS,sizeof(float)); //training target vector
-	int *inputindex = call_input();
-	int **targetindex = call_output();
+	float* input = (float*)calloc(WORDS, sizeof(float)); //input vector
+	float* target = (float*)calloc(WORDS, sizeof(float)); //training target vector
+	int* inputindex;
+
+	
+
+	int* frequency;
+	no = line_of_freq();
+	frequency = (int*)malloc(sizeof(int) * no);
+	call_frequency(frequency);
+
+	cout<<buildHTree(frequency, net, leaf)<<endl;
+
+
+	no = line_of_file();
+	inputindex = (int*)malloc(sizeof(int) * no);
+	call_input(inputindex);
+	int** targetindex;
+
+	no = line_of_file();
+	targetindex = (int**)malloc(sizeof(int*) * no);
+	for (int i = 0; i < no; i++) {
+		targetindex[i] = (int*)calloc(WINDOW, sizeof(int));
+	}
+	call_output(targetindex);
 	for (int i = 0; i < 100000; i++) { //training section
 		net->inputs[inputindex[i]] = 1;
 		target[targetindex[i][0]] = 1;
