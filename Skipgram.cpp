@@ -11,13 +11,7 @@
 
 using namespace std;
 
-struct wordfreq {
-	int num = -1;
-	int freq=0;
-	node* node=0;
-	wordfreq* left = 0;
-	wordfreq* right = 0;
-};
+
 
 
 struct node {
@@ -31,6 +25,14 @@ struct node {
 	float *oldWeights;
 	int inputnum;
 	float *error;
+};
+
+struct wordfreq {
+	int num = -1;
+	int freq = 0;
+	node *pnode = 0;
+	wordfreq* left = 0;
+	wordfreq* right = 0;
 };
 
 struct layer {
@@ -236,7 +238,7 @@ void bulidHTree(int* freq, network* NN) {
 			temp->freq = l1->freq + l2->freq;
 			temp->left = l1;
 			temp->right = l2;
-			temp->node = &NN->layers[NN->layernum - 1].nodes[WORDS - na];
+			temp->pnode = &NN->layers[NN->layernum - 1].nodes[WORDS - na];
 			
 			leaf[l1i] = temp;
 			leaf[l2i] = leaf[na-1];
