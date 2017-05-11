@@ -1,6 +1,8 @@
 #include <iostream>
 #include <math.h>
 #include <vector>
+#include "input.h"
+#include <omp.h>
 
 #define WORDS 100000
 #define FEATURES 300
@@ -94,12 +96,19 @@ void put_input(network* NN, double *inputs) {
 	}
 }
 
+float fma1(float x, float y, float z)
+{
+	return x * y + z;
+}
+
+
 double get_output(node *Node) {
 	double sum = 0;
 
 	for (int i = 0; i < Node->inputnum; i++) {
 		//cout << (*Node->inputs)[i]<<" ";
-		sum += (*Node->inputs)[i] * Node->weights[i];
+		//sum += (*Node->inputs)[i] * Node->weights[i];
+		sum = fma1((*Node->inputs)[i], Node->weights[i], sum);
 	}
 
 	sum += -1 * Node->threshold;
@@ -121,6 +130,7 @@ double get_output(node *Node) {
 double expsum;
 void calculation(network *NN) {
 	for (int i = 0; i < NN->layernum; i++) {
+		#pragma omp parallel for schedule(dynamic)
 		for (int j = 0; j < NN->layers[i].num; j++) {
 			NN->layers[i].outputs[j] = get_output(&(NN->layers[i].nodes[j]));
 		}
@@ -146,12 +156,14 @@ void training(network *NN, double LR, double* targets) {
 	for (int i = NN->layernum - 1; i >= 0; i--) {
 		cur = &NN->layers[i];
 		if (i == NN->layernum - 1) {
+			#pragma omp parallel for schedule(dynamic)
 			for (int j = 0; j < cur->num; j++) {
 				*(cur->nodes[j].error) = derivative(&cur->nodes[j],targets)*(targets[j] - *(cur->nodes[j].output));
 			}
 		}
 		else {
 			layer *next = &NN->layers[i + 1];
+			#pragma omp parallel for schedule(dynamic)
 			for (int j = 0; j < cur->num; j++) {
 				double temp = 0;
 				for (int k = 0; k < next->num; k++) {
@@ -165,6 +177,7 @@ void training(network *NN, double LR, double* targets) {
 	double tempWeight;
 	for (int i = NN->layernum - 1; i >= 0; i--) {
 		cur = &NN->layers[i];
+		#pragma omp parallel for schedule(dynamic)
 		for (int j = 0; j < cur->num; j++) {
 			tempWeight = cur->nodes[j].threshold;
 			cur->nodes[j].threshold += (LR * *(cur->nodes[j].error) * -1);
@@ -241,12 +254,20 @@ int main() {
 	int inputnum[] = { WORDS,FEATURES };
 	char types[] = { 'g','s' };
 	network* net = createNet(2, neuronnum, inputnum, types); //model initialization
-	double* input; //input vector
-	double* target; //training target vector
+	float* input = (float*)calloc(WORDS,sizeof(float)); //input vector
+	float* target = (float*)calloc(WORDS,sizeof(float)); //training target vector
+	int *inputindex = call_input();
+	int **targetindex = call_output();
 	for (int i = 0; i < 100000; i++) { //training section
+		net->inputs[inputindex[i]] = 1;
+		target[targetindex[i][0]] = 1;
 		put_input(net, input);
 		calculation(net);
 		training(net, 0.1, target);
+		net->inputs[inputindex[i]] = 0;
+		target[targetindex[i][0]] = 0;
+		if (!(i % 100))
+			cout << i / 100000.0 << endl;
 	}
 	double *outputs;
 	put_input(net, input);
