@@ -4,6 +4,7 @@
 #include "input.h"
 #include <omp.h>
 
+
 #define WORDS 100000
 #define FEATURES 300
 #define WINDOW 5
@@ -104,10 +105,10 @@ float fma1(float x, float y, float z)
 }
 
 
-float get_output(node *Node) {
+float get_output_1(node *Node) {
 	float sum = 0;
 
-	for (int i = 0; i < Node->inputnum; i++) {
+	for (int i = 0; i < FEATURES; i++) {
 		//cout << (*Node->inputs)[i]<<" ";
 		//sum += (*Node->inputs)[i] * Node->weights[i];
 		sum = fma1((*Node->inputs)[i], Node->weights[i], sum);
@@ -115,31 +116,43 @@ float get_output(node *Node) {
 
 	sum += -1 * Node->threshold;
 	float temp;
-	switch (Node->type) {
-	case 'g':
-		temp = -sum;
-		*(Node->output) = 1.0 / (1 + exp(temp));
-		break;
-	case 's':
-		if (sum > 5) *(Node->output) = exp(5);
-		else if (sum < -5) *(Node->output) = 0;
-		else *(Node->output) = exp(sum);
-		break;
-	}
+	temp = -sum;
+	*(Node->output) = 1.0 / (1 + exp(temp));
 	//cout << *(Node->output) << endl;
 	return *(Node->output);
 }
+
+float get_output_0(node *Node) {
+	float sum = 0;
+
+	for (int i = 0; i < WORDS; i++) {
+		//cout << (*Node->inputs)[i]<<" ";
+		//sum += (*Node->inputs)[i] * Node->weights[i];
+		sum = fma1((*Node->inputs)[i], Node->weights[i], sum);
+	}
+
+	sum += -1 * Node->threshold;
+	float temp;
+	if (sum > 5) *(Node->output) = exp(5);
+	else if (sum < -5) *(Node->output) = 0;
+	else *(Node->output) = exp(sum);
+	//cout << *(Node->output) << endl;
+	return *(Node->output);
+}
+
 float expsum;
 void calculation(network *NN) {
-	for (int i = 0; i < NN->layernum; i++) {
-		#pragma omp parallel for schedule(dynamic)
-		for (int j = 0; j < NN->layers[i].num; j++) {
-			NN->layers[i].outputs[j] = get_output(&(NN->layers[i].nodes[j]));
-		}
+	#pragma omp parallel for schedule(dynamic)
+	for (int j = 0; j < WORDS; j++) {
+		NN->layers[1].outputs[j] = get_output_1(&(NN->layers[1].nodes[j]));
+	}
+	#pragma omp parallel for schedule(dynamic)
+	for (int j = 0; j < FEATURES; j++) {
+		NN->layers[0].outputs[j] = get_output_0(&(NN->layers[0].nodes[j]));
 	}
 }
 
-float derivative(node *Node, float* targets) {
+/*float derivative(node *Node, float* targets) {
 	float temp;
 	float *k = Node->output;
 	switch (Node->type) {
@@ -151,45 +164,55 @@ float derivative(node *Node, float* targets) {
 		break;
 	}
 	return temp;
-}
+}*/
 
 void training(network *NN, float LR, float* targets) {
 	layer *cur;
-	for (int i = NN->layernum - 1; i >= 0; i--) {
-		cur = &NN->layers[i];
-		if (i == NN->layernum - 1) {
-			#pragma omp parallel for schedule(dynamic)
-			for (int j = 0; j < cur->num; j++) {
-				*(cur->nodes[j].error) = derivative(&cur->nodes[j],targets)*(targets[j] - *(cur->nodes[j].output));
-			}
-		}
-		else {
-			layer *next = &NN->layers[i + 1];
-			#pragma omp parallel for schedule(dynamic)
-			for (int j = 0; j < cur->num; j++) {
-				float temp = 0;
-				for (int k = 0; k < next->num; k++) {
-					temp += *(next->nodes[k].error)*next->nodes[k].weights[j];
-				}
-				*(cur->nodes[j].error) = derivative(&cur->nodes[j],targets)*temp;
-			}
+	
+	cur = &NN->layers[1];
+	#pragma omp parallel for schedule(dynamic)
+	for (int j = 0; j < WORDS; j++) {
+		*(cur->nodes[j].error) = (targets[j] - *(cur->nodes[j].output));
+		cur->nodes[j].threshold += (LR * *(cur->nodes[j].error) * -1);
+		for (int k = 0; k < FEATURES; k++) {
+			cur->nodes[j].weights[k] += (LR * *(cur->nodes[j].error) * (*cur->nodes[j].inputs)[k]);
 		}
 	}
 
-	float tempWeight;
-	for (int i = NN->layernum - 1; i >= 0; i--) {
-		cur = &NN->layers[i];
-		#pragma omp parallel for schedule(dynamic)
-		for (int j = 0; j < cur->num; j++) {
-			tempWeight = cur->nodes[j].threshold;
-			cur->nodes[j].threshold += (LR * *(cur->nodes[j].error) * -1);
+	cur = &NN->layers[0];
+	layer *next = &NN->layers[1];
+	#pragma omp parallel for schedule(dynamic)
+	for (int j = 0; j < FEATURES; j++) {
+		float temp = 0;
+		for (int k = 0; k < WORDS; k++) {
+			temp += *(next->nodes[k].error)*next->nodes[k].weights[j];
+		}
+		*(cur->nodes[j].error) = *(cur->nodes[j].output) * (1 - *(cur->nodes[j].output)) * temp;
 
-			for (int k = 0; k < cur->nodes[j].inputnum; k++) {
-				tempWeight = cur->nodes[j].weights[k];
-				cur->nodes[j].weights[k] += (LR * *(cur->nodes[j].error) * (*cur->nodes[j].inputs)[k]);
-			}
+		cur->nodes[j].threshold += (LR * *(cur->nodes[j].error) * -1);
+		for (int k = 0; k < WORDS; k++) {
+			cur->nodes[j].weights[k] += (LR * *(cur->nodes[j].error) * (*cur->nodes[j].inputs)[k]);
 		}
 	}
+	/*
+	cur = &NN->layers[1];
+	#pragma omp parallel for schedule(dynamic)
+	for (int j = 0; j < WORDS; j++) {
+		cur->nodes[j].threshold += (LR * *(cur->nodes[j].error) * -1);
+		for (int k = 0; k < FEATURES; k++) {
+			cur->nodes[j].weights[k] += (LR * *(cur->nodes[j].error) * (*cur->nodes[j].inputs)[k]);
+		}
+	}
+	
+	cur = &NN->layers[0];
+	#pragma omp parallel for schedule(dynamic)
+	for (int j = 0; j < FEATURES; j++) {
+		cur->nodes[j].threshold += (LR * *(cur->nodes[j].error) * -1);
+		for (int k = 0; k < WORDS; k++) {
+			cur->nodes[j].weights[k] += (LR * *(cur->nodes[j].error) * (*cur->nodes[j].inputs)[k]);
+		}
+	}*/
+
 }
 
 float* output(network* NN) {
