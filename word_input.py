@@ -10,8 +10,6 @@ if __name__ == '__main__':
 	f.close()
 	print("complete: read dictionary")
 
-	length = len(dictionary)
-
 	f = open(name)
 	text = f.read()
 	f.close()
@@ -29,28 +27,40 @@ if __name__ == '__main__':
 
 	i = 0
 	for token in tokens:
+		k = 0
 		summary = ""
 		try:
 			position = dictionary.index(token)
-			position = str(position)
-			summary = summary + position
+			summary = str(position)
 		except:
+			i += 1
 			continue
-		for j in range(3):
+		for j in [2,1,0]:
 			if (i - j - 1) >= 0 :
 				try:
 					out = dictionary.index(tokens[i-j-1])
-					out = str(out)
-					summary = summary + ' ' + out
+					summary = summary + ' ' + str(out)
 				except:
-					continue
+					summary = summary + ' ' + 'x'
+					k += 1
+			else:
+				summary = summary + ' ' + 'x'
+				k += 1
+		for j in range(3):
 			if (i + j + 1) < t_length:
 				try:
 					out = dictionary.index(tokens[i+j+1])
-					out = str(out)
-					summary = summary + ' ' + out
+					summary = summary + ' ' + str(out)
 				except:
-					continue
+					summary = summary + ' ' + 'x'
+					k += 1
+			else:
+				summary = summary + ' ' + 'x'
+				k += 1
+		print(k)
+		if k == 6:
+			i += 1
+			continue
 		summary += '\n'
 		f.write(summary)
 		i += 1
