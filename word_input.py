@@ -57,7 +57,6 @@ if __name__ == '__main__':
 			else:
 				summary = summary + ' ' + 'x'
 				k += 1
-		print(k)
 		if k == 6:
 			i += 1
 			continue
