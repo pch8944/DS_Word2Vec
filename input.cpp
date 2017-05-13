@@ -117,11 +117,11 @@ void call_output(int** arr) {
 	err = fopen_s(&fp, "D://input.txt", "r");
 
 	j = 0;
-	while (j<no) {
+	while (j<no) {	//한 줄씩 호출
 		fgets(buffer, sizeof(buffer), fp);
 		k = 0;
 		position = 0;
-		while (buffer[k] != 10) {
+		while (buffer[k] != 10) { // 공백으로 구분
 			if (k == 0)
 				front = 0;
 			else
@@ -134,9 +134,13 @@ void call_output(int** arr) {
 
 			if (position++ == 0)
 				continue;
-			for (i = 0, sum = 0; end >= front; i++, end--) {
-				sum += pow(10, i)*(buffer[end] - '0');
+			if (buffer[end] != 'x') {
+				for (i = 0, sum = 0; end >= front; i++, end--) {
+					sum += pow(10, i)*(buffer[end] - '0');
+				}
 			}
+			else
+				sum = -1;
 
 			arr[j][position - 2] = sum;
 
