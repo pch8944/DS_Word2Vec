@@ -24,7 +24,7 @@ if __name__ == '__main__':
 			dictionary.append(token)
 	print("complete: make dictionary")
 
-	f = open('dictionary', 'wb')
+	f = open('dictionary_raw', 'wb')
 	pickle.dump(dictionary, f)
 	f.close()
 	print("complete: write binary file")
