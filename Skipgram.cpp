@@ -17,7 +17,7 @@ using namespace std;
 
 struct node {
 	char type;
-	char num;
+	int num;
 	float **inputs;
 	float *output;
 	float threshold;
@@ -49,6 +49,7 @@ struct layer {
 
 struct network {
 	int inputnum;
+	int inputindex;
 	float *inputs;
 	float **outputs;
 	int layernum;
@@ -62,11 +63,12 @@ float randnum() {
 	return (((float)rand() * 2) / ((float)RAND_MAX + 1)) - 1;
 }
 
+
 network* createNet(int layers, int *nodes, int *inputs, char* types) {
 
 	network* NN = new network;
 	NN->inputnum = inputs[0];
-	NN->inputs = new float[NN->inputnum];
+	NN->inputs = (float*)calloc(NN->inputnum,sizeof(float));
 	NN->layernum = layers;
 	NN->layers = new layer[layers];
 	layer *old = NULL;
@@ -88,6 +90,7 @@ network* createNet(int layers, int *nodes, int *inputs, char* types) {
 			}
 			tempnodes[j].output = new float;
 			tempnodes[j].error = &(temp->error[0][j]);
+			*(tempnodes[j].error) = 0;
 			tempnodes[j].type = types[i];
 			tempnodes[j].num = j;
 			temp->outputs[j] = *(tempnodes->output);
@@ -115,7 +118,7 @@ float fma1(float x, float y, float z)
 }
 
 
-float get_output_1(node *Node) {
+void get_output_1(node *Node) {
 	float sum = 0;
 
 	for (int i = 0; i < FEATURES; i++) {
@@ -123,28 +126,28 @@ float get_output_1(node *Node) {
 		//sum += (*Node->inputs)[i] * Node->weights[i];
 		sum = fma1((*Node->inputs)[i], Node->weights[i], sum);
 	}
-
-	sum += -1 * Node->threshold;
+	*(Node->output) = sum;
+	/*//sum += -1 * Node->threshold;
 	float temp;
 	temp = -sum;
 	*(Node->output) = 1.0 / (1 + exp(temp));
-	//cout << *(Node->output) << endl;
-	return *(Node->output);
+	//cout << *(Node->output) << endl;*/
+	//return *(Node->output);
 }
 
-float get_output_0(node *Node) {
-	float sum = 0;
+float get_output_0(node *Node,int i) {
+	/*float sum = 0;
 
-	for (int i = 0; i < Node->inputnum; i++) {
+
 		//cout << (*Node->inputs)[i]<<" ";
 		//sum += (*Node->inputs)[i] * Node->weights[i];
-		sum = fma1((*Node->inputs)[i], Node->weights[i], sum);
-	}
+	sum = (*Node->inputs)[i] * Node->weights[i];
 
-	sum += -1 * Node->threshold;
+
+	//sum += -1 * Node->threshold;
 	float temp;
-	temp = -sum;
-	*(Node->output) = 1.0 / (1 + exp(temp));
+	temp = -sum;*/
+	*(Node->output) = 1.0 / (1 + exp(-(*Node->inputs)[i] * Node->weights[i]));
 	//cout << *(Node->output) << endl;
 	return *(Node->output);
 }
@@ -152,12 +155,13 @@ float get_output_0(node *Node) {
 float expsum;
 void calculation(network *NN) {
 #pragma omp parallel for schedule(dynamic)
-	for (int j = 0; j < NN->layers[1].num; j++) {
-		NN->layers[1].outputs[j] = get_output_1(&(NN->layers[1].nodes[j]));
+	for (int j = 0; j < FEATURES; j++) {
+		NN->layers[0].outputs[j] = get_output_0(&(NN->layers[0].nodes[j]),NN->inputindex);
+		//cout << NN->layers[0].outputs[j];
 	}
 #pragma omp parallel for schedule(dynamic)
-	for (int j = 0; j < FEATURES; j++) {
-		NN->layers[0].outputs[j] = get_output_0(&(NN->layers[0].nodes[j]));
+	for (int j = 0; j < NN->layers[1].num; j++) {
+		get_output_1(&(NN->layers[1].nodes[j]));
 	}
 }
 
@@ -175,10 +179,7 @@ break;
 return temp;
 }*/
 
-void training(network *NN, float LR, int target) {
-	layer *cur;
-
-	cur = &NN->layers[1];
+void training(network *NN, float LR, int* targets) {
 	/*
 #pragma omp parallel for schedule(dynamic)
 	for (int j = 0; j < cur->num; j++) {
@@ -189,33 +190,57 @@ void training(network *NN, float LR, int target) {
 		}
 	}
 	*/
-	wordfreq* curnode = root;
-	node* route;
-	for (int i = 0; i < codeword[target].length(); i++) {
-		route = curnode->pnode;
-		int way = codeword[target][i] - '0';
-		*(route->error) = 1 - way - *(route->output);
-		route->threshold += (LR * *(route->error) * -1);
-#pragma omp parallel for schedule(dynamic)
-		for (int k = 0; k < FEATURES; k++) {
-			route->weights[k] += (LR * *(route->error) * (*route->inputs)[k]);
-		}
-		curnode = curnode->dir[way];
-	}
+	
+	for (int l = 1; l < WINDOW-1; l++) {
+		layer *cur;
 
-	cur = &NN->layers[0];
-	layer *next = &NN->layers[1];
-#pragma omp parallel for schedule(dynamic)
-	for (int j = 0; j < FEATURES; j++) {
-		float temp = 0;
-		for (int k = 0; k < next->num; k++) {
-			temp = fma1(next->error[0][k],next->nodes[k].weights[j],temp);
-		}
-		*(cur->nodes[j].error) = *(cur->nodes[j].output) * (1 - *(cur->nodes[j].output)) * temp;
+		cur = &NN->layers[1];
+		vector<int> actlist;
+		wordfreq* curnode = root;
+		node* route;
 
-		cur->nodes[j].threshold += (LR * *(cur->nodes[j].error) * -1);
-		for (int k = 0; k < next->num; k++) {
-			cur->nodes[j].weights[k] += (LR * *(cur->nodes[j].error) * (*cur->nodes[j].inputs)[k]);
+		int target = targets[l];
+		if (target != -1) {
+			for (int i = 0; i < codeword[target].length(); i++) {
+				route = curnode->pnode;
+				int way = codeword[target][i] - '0';
+				actlist.push_back(route->num);
+				*(route->output) = 1.0 / (1 + exp(-*(route->output)));
+				*(route->error) = 1 - way - *(route->output);
+				//cout << *(route->error);
+				//route->threshold += (LR * *(route->error) * -1);
+#pragma omp parallel for schedule(dynamic)
+				for (int k = 0; k < FEATURES; k++) {
+					route->weights[k] += (LR * *(route->error) * (*route->inputs)[k]);
+				}
+				curnode = curnode->dir[way];
+			}
+
+
+
+			cur = &NN->layers[0];
+			layer *next = &NN->layers[1];
+#pragma omp parallel for schedule(dynamic)
+			for (int j = 0; j < FEATURES; j++) {
+				float temp = 0;
+				/*for (int k = 0; k < next->num; k++) {
+					temp = fma1(next->error[0][k],next->nodes[k].weights[j],temp);
+					next->error[0][k] = 0;
+				}*/
+
+				for (vector<int>::iterator iter = actlist.begin(); iter != actlist.end(); iter++) {
+					int n = *iter;
+					temp = fma1(next->error[0][n], next->nodes[n].weights[j], temp);
+				}
+				*(cur->nodes[j].error) = LR * *(cur->nodes[j].output) * (1 - *(cur->nodes[j].output)) * temp;
+
+				//cur->nodes[j].threshold += (LR * *(cur->nodes[j].error) * -1);
+				/*for (int k = 0; k < next->num; k++) {
+					cur->nodes[j].weights[k] = fma1(*(cur->nodes[j].error), (*cur->nodes[j].inputs)[k], cur->nodes[j].weights[k]);
+				}*/
+				int k = NN->inputindex;
+				cur->nodes[j].weights[k] = fma1(*(cur->nodes[j].error), (*cur->nodes[j].inputs)[k], cur->nodes[j].weights[k]);
+			}
 		}
 	}
 	/*
@@ -391,7 +416,7 @@ int main() {
 	float* input = (float*)calloc(no, sizeof(float)); //input vector
 	//float* target = (float*)calloc(WORDS, sizeof(float)); //training target vector
 	int* inputindex;
-
+	char inputstr[30];
 	
 
 	root = buildHTree(frequency, net, leaf);
@@ -409,40 +434,69 @@ int main() {
 		targetindex[i] = (int*)calloc(WINDOW, sizeof(int));
 	}
 	call_output(targetindex);
-	for (int i = 0; i < no; i+=10000) { //training section
-		if (inputindex[i] > wordnum || targetindex[i][0]==-1)
-			continue;
-		net->inputs[inputindex[i]] = 1;
-		put_input(net, input);
+	int trained = 0;
+	for (int n = 0; n < 3; n++) {
+		for (int i = rand()%50; i < no; i+=rand()%50) { //training section
+			/*if (inputindex[i] > wordnum || targetindex[i][0] == -1)
+				continue;*/
+			//get_word(inputindex[i], inputstr);
+			//cout << inputstr << " ";
+			net->inputs[inputindex[i]] = 1;
+			net->inputindex = inputindex[i];
+			//put_input(net, input);
+			calculation(net);
+			for (int j = 0; j<WINDOW; j++) {
+				training(net, 0.25/log10(100+trained++), targetindex[i]);
+				//get_word(targetindex[i][j], inputstr);
+				//cout << inputstr << " ";
+			}
+			//cout << endl;
+
+			net->inputs[inputindex[i]] = 0;
+			if (!(trained % 1000))
+				cout << (double)i / no << endl;
+		}
+	}
+
+
+	out **outputs = new out*[wordnum];
+	for (int k = 0; k < wordnum; k++) {
+		outputs[k] = new out[20];
+		net->inputs[k] = 1;
 		calculation(net);
-		for (int j = 0; targetindex[i][j] > -1 && targetindex[i][j] < wordnum; j++)
-			training(net, 0.1, targetindex[i][j]);
-
-		net->inputs[inputindex[i]] = 0;
-		if (!(i % 100))
-			cout << (double)i / no << endl;
+		net->inputs[k] = 0;
+		vector<out> result;
+		for (int i = 0; i < wordnum; i++) {
+			wordfreq* cur = root;
+			float prob = 1;
+			for (int j = 0; j < codeword[i].length(); j++) {
+				int way = codeword[i][j] - '0';
+				node* curnode = cur->pnode;
+				prob *= (*(curnode->output) + way - 2 * *(curnode->output) * way);
+				cur = cur->dir[way];
+			}
+			out* temp = new out;
+			temp->num = i;
+			temp->value = prob;
+			result.push_back(*temp);
+		}
+		quickSort(result, 0, wordnum);
+		for (int i = 0; i < 20; i++) {
+			outputs[k][i].num = result[wordnum - i].num;
+			outputs[k][i].value = result[wordnum - i].value;
+		}
 	}
-	vector<out> result;
-	char inputstr[30];
-	cin >> inputstr;
-	int inputind = get_index(inputstr);
-	net->inputs[inputind] = 1;
-	float *outputs;
-	put_input(net, input);
-	calculation(net);
-	outputs = output(net);
-	for (int i = 0; i < wordnum; i++) {
-		out* temp = new out;
-		temp->num = i;
-		temp->value = outputs[i];
-		result.push_back(*temp);
-	}
-
-	quickSort(result, 0, wordnum);
-	char outputstr[30];
-	for (int i = 0; i < 10; i++) {
-		get_word(result[wordnum - i].num, outputstr);
-		cout << outputstr << " ";
+	
+	
+	while (true) {
+		cin >> inputstr;
+		int inputind = get_index(inputstr);
+		get_word(inputind, inputstr);
+		cout << "Input : " << inputstr << "[" << inputind << "]" << endl;
+		for (int i = 0; i < 20; i++) {
+			get_word(outputs[inputind][i].num, inputstr);
+			cout << inputstr << " : " << outputs[inputind][i].value << endl;
+		}
 	}
 	
 	getchar();
