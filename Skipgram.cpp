@@ -5,6 +5,7 @@
 #include <omp.h>
 #include <string>
 #include <atlcoll.h>
+#include <fstream>
 
 
 #define WORDS 100000
@@ -147,7 +148,7 @@ float get_output_0(node *Node,int i) {
 	//sum += -1 * Node->threshold;
 	float temp;
 	temp = -sum;*/
-	*(Node->output) = 1.0 / (1 + exp(-(*Node->inputs)[i] * Node->weights[i]));
+	*(Node->output) = Node->weights[i];
 	//cout << *(Node->output) << endl;
 	return *(Node->output);
 }
@@ -192,6 +193,7 @@ void training(network *NN, float LR, int* targets) {
 	*/
 	
 	for (int l = 1; l < WINDOW-1; l++) {
+		calculation(NN);
 		layer *cur;
 
 		cur = &NN->layers[1];
@@ -204,14 +206,18 @@ void training(network *NN, float LR, int* targets) {
 			for (int i = 0; i < codeword[target].length(); i++) {
 				route = curnode->pnode;
 				int way = codeword[target][i] - '0';
+				if (!(*(route->output) < 6 && *(route->output) > -6)) {
+					curnode = curnode->dir[way];
+					continue;
+				}
 				actlist.push_back(route->num);
 				*(route->output) = 1.0 / (1 + exp(-*(route->output)));
-				*(route->error) = 1 - way - *(route->output);
+				*(route->error) = LR*(1 - way - *(route->output));
 				//cout << *(route->error);
 				//route->threshold += (LR * *(route->error) * -1);
 #pragma omp parallel for schedule(dynamic)
 				for (int k = 0; k < FEATURES; k++) {
-					route->weights[k] += (LR * *(route->error) * (*route->inputs)[k]);
+					route->weights[k] += (*(route->error) * (*route->inputs)[k]);
 				}
 				curnode = curnode->dir[way];
 			}
@@ -232,14 +238,15 @@ void training(network *NN, float LR, int* targets) {
 					int n = *iter;
 					temp = fma1(next->error[0][n], next->nodes[n].weights[j], temp);
 				}
-				*(cur->nodes[j].error) = LR * *(cur->nodes[j].output) * (1 - *(cur->nodes[j].output)) * temp;
+
+				//*(cur->nodes[j].error) = LR * *(cur->nodes[j].output) * (1 - *(cur->nodes[j].output)) * temp;
 
 				//cur->nodes[j].threshold += (LR * *(cur->nodes[j].error) * -1);
 				/*for (int k = 0; k < next->num; k++) {
 					cur->nodes[j].weights[k] = fma1(*(cur->nodes[j].error), (*cur->nodes[j].inputs)[k], cur->nodes[j].weights[k]);
 				}*/
 				int k = NN->inputindex;
-				cur->nodes[j].weights[k] = fma1(*(cur->nodes[j].error), (*cur->nodes[j].inputs)[k], cur->nodes[j].weights[k]);
+				cur->nodes[j].weights[k] += temp;
 			}
 		}
 	}
@@ -269,24 +276,24 @@ float* output(network* NN) {
 }
 
 
-int partition(vector<wordfreq*> &a, int l, int r) {
+int partition(vector<wordfreq*> *a, int l, int r) {
 	wordfreq* pivot, *t;
 	int i, j;
-	pivot = a[l];
+	pivot = (*a)[l];
 	i = l; j = r + 1;
 
 	while (1)
 	{
-		do ++i; while (a[i]->freq <= pivot->freq && i <= r);
-		do --j; while (a[j]->freq > pivot->freq);
+		do ++i; while (i <= r && (*a)[i]->freq <= pivot->freq);
+		do --j; while ((*a)[j]->freq > pivot->freq);
 		if (i >= j) break;
-		t = a[i]; a[i] = a[j]; a[j] = t;
+		t = (*a)[i]; (*a)[i] = (*a)[j]; (*a)[j] = t;
 	}
-	t = a[l]; a[l] = a[j]; a[j] = t;
+	t = (*a)[l]; (*a)[l] = (*a)[j]; (*a)[j] = t;
 	return j;
 }
 
-void quickSort(vector<wordfreq*> &a, int l, int r)
+void quickSort(vector<wordfreq*> *a, int l, int r)
 {
 	int j;
 
@@ -300,24 +307,24 @@ void quickSort(vector<wordfreq*> &a, int l, int r)
 
 }
 
-int partition(vector<out> &a, int l, int r) {
+int partition(vector<out> *a, int l, int r) {
 	out pivot, t;
 	int i, j;
-	pivot = a[l];
+	pivot = (*a)[l];
 	i = l; j = r + 1;
 
 	while (1)
 	{
-		do ++i; while (a[i].value <= pivot.value && i <= r);
-		do --j; while (a[j].value > pivot.value);
+		do ++i; while ((*a)[i].value <= pivot.value && i <= r);
+		do --j; while ((*a)[j].value > pivot.value);
 		if (i >= j) break;
-		t = a[i]; a[i] = a[j]; a[j] = t;
+		t = (*a)[i]; (*a)[i] = (*a)[j]; (*a)[j] = t;
 	}
-	t = a[l]; a[l] = a[j]; a[j] = t;
+	t = (*a)[l]; (*a)[l] = (*a)[j]; (*a)[j] = t;
 	return j;
 }
 
-void quickSort(vector<out> &a, int l, int r)
+void quickSort(vector<out> *a, int l, int r)
 {
 	int j;
 
@@ -325,8 +332,14 @@ void quickSort(vector<out> &a, int l, int r)
 	{
 		// divide and conquer
 		j = partition(a, l, r);
-		quickSort(a, l, j - 1);
-		quickSort(a, j + 1, r);
+		if (j - l < r - j) {
+			quickSort(a, l, j - 1);
+			quickSort(a, j + 1, r);
+		}
+		else {
+			quickSort(a, j + 1, r);
+			quickSort(a, l, j - 1);
+		}
 	}
 
 }
@@ -339,7 +352,7 @@ wordfreq* buildHTree(int* freq, network* NN, vector<wordfreq*> &leaf) {
 		na = leaf.size();
 	int assigned = 0;
 	wordfreq* root=NULL;
-	quickSort(leaf, 0, na - 1);
+	quickSort(&leaf, 0, na - 1);
 	while (na-1) {
 		wordfreq *l1, *l2;
 		int l1i, l2i;
@@ -380,6 +393,29 @@ void getcodeword(string* code, wordfreq* node, string codenum) {
 	}
 }
 
+void savenet(network* NN){
+	ofstream oFile("network.net");
+
+	layer* cur = &(NN->layers[0]);
+	for (int i = 0; i < cur->num; i++) {
+		for (int j = 0; j < cur->nodes[i].inputnum; j++)
+			oFile << cur->nodes[i].weights[j] << '\t';
+	}
+	cur = &(NN->layers[1]);
+	for (int i = 0; i < cur->num; i++) {
+		for (int j = 0; j < cur->nodes[i].inputnum; j++)
+			oFile << cur->nodes[i].weights[j] << '\t';
+	}
+}
+
+void loadnet(network* NN) {
+	ifstream iFile("network.net");
+
+	layer* cur = &(NN->layers[0]);
+	for (int i = 0; i < cur->num; i++) {
+		
+	}
+}
 
 int main() {
 
@@ -436,7 +472,7 @@ int main() {
 	call_output(targetindex);
 	int trained = 0;
 	for (int n = 0; n < 3; n++) {
-		for (int i = rand()%50; i < no; i+=rand()%50) { //training section
+		for (int i = 0; i < no; i++) { //training section
 			/*if (inputindex[i] > wordnum || targetindex[i][0] == -1)
 				continue;*/
 			//get_word(inputindex[i], inputstr);
@@ -444,27 +480,26 @@ int main() {
 			net->inputs[inputindex[i]] = 1;
 			net->inputindex = inputindex[i];
 			//put_input(net, input);
-			calculation(net);
-			for (int j = 0; j<WINDOW; j++) {
-				training(net, 0.25/log10(100+trained++), targetindex[i]);
-				//get_word(targetindex[i][j], inputstr);
-				//cout << inputstr << " ";
-			}
+			
+			training(net, 0.025, targetindex[i]);
 			//cout << endl;
 
 			net->inputs[inputindex[i]] = 0;
-			if (!(trained % 1000))
+			if (!(i % 1000))
 				cout << (double)i / no << endl;
 		}
 	}
-
-
-	out **outputs = new out*[wordnum];
-	for (int k = 0; k < wordnum; k++) {
-		outputs[k] = new out[20];
-		net->inputs[k] = 1;
+	savenet(net);
+	
+	while (true) {
+		cin >> inputstr;
+		int inputind = get_index(inputstr);
+		get_word(inputind, inputstr);
+		cout << "Input : " << inputstr << "[" << inputind << "]" << endl;
+		net->inputs[inputind] = 1;
+		net->inputindex = inputind;
 		calculation(net);
-		net->inputs[k] = 0;
+		net->inputs[inputind] = 0;
 		vector<out> result;
 		for (int i = 0; i < wordnum; i++) {
 			wordfreq* cur = root;
@@ -472,7 +507,10 @@ int main() {
 			for (int j = 0; j < codeword[i].length(); j++) {
 				int way = codeword[i][j] - '0';
 				node* curnode = cur->pnode;
-				prob *= (*(curnode->output) + way - 2 * *(curnode->output) * way);
+				float sig = 1.0 / (1.0 + exp(-*(curnode->output)));
+				prob *= (sig + way - 2 * sig * way);
+				if (prob > 1)
+					prob = 0;
 				cur = cur->dir[way];
 			}
 			out* temp = new out;
@@ -480,22 +518,10 @@ int main() {
 			temp->value = prob;
 			result.push_back(*temp);
 		}
-		quickSort(result, 0, wordnum);
+		quickSort(&result, 0, wordnum);
 		for (int i = 0; i < 20; i++) {
-			outputs[k][i].num = result[wordnum - i].num;
-			outputs[k][i].value = result[wordnum - i].value;
-		}
-	}
-	
-	
-	while (true) {
-		cin >> inputstr;
-		int inputind = get_index(inputstr);
-		get_word(inputind, inputstr);
-		cout << "Input : " << inputstr << "[" << inputind << "]" << endl;
-		for (int i = 0; i < 20; i++) {
-			get_word(outputs[inputind][i].num, inputstr);
-			cout << inputstr << " : " << outputs[inputind][i].value << endl;
+			get_word(result[wordnum - i].num, inputstr);
+			cout << inputstr << " : " << result[wordnum - i].value << endl;
 		}
 	}
 	
